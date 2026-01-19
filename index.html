@@ -1,9 +1,9 @@
-
+!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyberpunk Audio Visualizer (Mild Version)</title>
+    <title>Cosmic Audio Visualizer</title>
     <style>
         body {
             margin: 0;
@@ -12,11 +12,11 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        /* 背景：ダークブルーから黒への放射状グラデーション */
+        /* 背景：深宇宙のような漆黒からダークブルーへのグラデーション */
         #canvas-container {
             width: 100vw;
             height: 100vh;
-            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+            background: radial-gradient(circle at center, #050510 0%, #000000 100%);
         }
 
         /* UI: SF映画風ガラスモーフィズムボタン */
@@ -36,14 +36,14 @@
         .btn {
             border: 2px solid #00ffff;
             color: #00ffff;
-            background-color: rgba(0, 0, 0, 0.3);
+            background-color: rgba(0, 20, 40, 0.4); /* 青みを帯びた黒 */
             padding: 12px 30px;
             font-size: 16px;
             font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 2px;
             cursor: pointer;
-            backdrop-filter: blur(10px); /* ガラスモーフィズム */
+            backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-radius: 4px;
             box-shadow: 0 0 10px #00ffff, inset 0 0 5px #00ffff;
@@ -52,7 +52,7 @@
         }
 
         .btn:hover {
-            background-color: rgba(0, 255, 255, 0.1);
+            background-color: rgba(0, 255, 255, 0.15);
             box-shadow: 0 0 20px #00ffff, inset 0 0 10px #00ffff;
         }
 
@@ -67,9 +67,9 @@
 
         #status {
             margin-top: 10px;
-            color: #ff00ff;
+            color: #88ffff; /* 文字色も水色系に */
             font-size: 12px;
-            text-shadow: 0 0 3px #ff00ff;
+            text-shadow: 0 0 3px #00ffff;
             opacity: 0;
             transition: opacity 0.5s;
         }
@@ -90,7 +90,7 @@
             <button class="btn">Upload Audio</button>
             <input type="file" id="file-input" accept="audio/*" />
         </div>
-        <div id="status">Ready to initialize system...</div>
+        <div id="status">System Standby...</div>
     </div>
 
     <div id="canvas-container"></div>
@@ -104,15 +104,17 @@
 
         // --- 設定定数 ---
         const COLORS = {
-            cyan: 0x00ffff,
-            magenta: 0xff00ff,
-            white: 0xffffff,
-            bgCenter: 0x1a1a2e
+            cyan: 0x00ffff,      // 外側のワイヤーフレーム
+            coreBlue: 0x44ffff,  // インナーコア（ネオン水色）
+            white: 0xffffff,     // 発光時の白
+            star: 0xaaddff       // 星（わずかに青白い）
         };
 
         // --- シーン初期化 ---
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
+        // 宇宙の奥行きを出すためにFogを追加（遠くを暗くする）
+        scene.fog = new THREE.FogExp2(0x000000, 0.015);
         
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 30;
@@ -127,14 +129,14 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 1.0; // 基本の回転速度を少し下げる
+        controls.autoRotateSpeed = 0.8; // 宇宙的なゆっくりした回転
 
         // --- ポストプロセス (Bloom) ---
         const renderScene = new RenderPass(scene, camera);
-        // Bloomの強度も少し抑えめに調整
-        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.85);
-        bloomPass.strength = 2.0;
-        bloomPass.radius = 0.5;
+        // 宇宙の輝きを表現するためBloomを少し調整
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.strength = 2.2; // 輝き
+        bloomPass.radius = 0.6;
         bloomPass.threshold = 0.1;
 
         const composer = new EffectComposer(renderer);
@@ -144,34 +146,37 @@
         // --- オブジェクト作成 ---
 
         // 1. メインオブジェクト: ワイヤーフレーム球体
-        const geometryMain = new THREE.IcosahedronGeometry(10, 4);
+        const geometryMain = new THREE.IcosahedronGeometry(10, 5); // 詳細度を少し上げる
         geometryMain.userData.originalPositions = geometryMain.attributes.position.array.slice(); 
         
         const materialMain = new THREE.MeshBasicMaterial({ 
             color: COLORS.cyan, 
             wireframe: true,
             transparent: true,
-            opacity: 0.8
+            opacity: 0.6 // 少し透明度を上げて繊細に
         });
         const mainSphere = new THREE.Mesh(geometryMain, materialMain);
         scene.add(mainSphere);
 
-        // 2. インナーコア: ソリッド球体
-        const geometryCore = new THREE.SphereGeometry(4, 32, 32);
+        // 2. インナーコア: 色をピンクからネオン水色に変更
+        const geometryCore = new THREE.SphereGeometry(3.5, 64, 64); // 少し小さく高精細に
         const materialCore = new THREE.MeshBasicMaterial({ 
-            color: COLORS.magenta 
+            color: COLORS.coreBlue // ネオン水色
         });
         const innerCore = new THREE.Mesh(geometryCore, materialCore);
         scene.add(innerCore);
 
-        // 3. パーティクルシステム
-        const particleCount = 800; // パーティクル数も少し減らす
+        // 3. パーティクルシステム（星空）
+        // 宇宙空間っぽくするために数を増やし、範囲を広げる
+        const particleCount = 1500;
         const particleGeometry = new THREE.BufferGeometry();
         const particlePositions = new Float32Array(particleCount * 3);
+        const particleSizes = new Float32Array(particleCount); // 星の大きさのばらつき用
         const particleVelocities = [];
 
         for(let i = 0; i < particleCount; i++) {
-            const r = 20 + Math.random() * 40;
+            // 範囲を広く取る (半径20〜100)
+            const r = 20 + Math.random() * 80;
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos((Math.random() * 2) - 1);
             
@@ -183,20 +188,26 @@
             particlePositions[i * 3 + 1] = y;
             particlePositions[i * 3 + 2] = z;
 
-            // 基本速度を遅くする
+            // 星のサイズをランダムに
+            particleSizes[i] = Math.random() * 0.3 + 0.1;
+
+            // ゆっくり流れる動き
             particleVelocities.push({
-                x: (Math.random() - 0.5) * 0.05,
-                y: (Math.random() - 0.5) * 0.05,
-                z: (Math.random() - 0.5) * 0.05
+                x: (Math.random() - 0.5) * 0.02,
+                y: (Math.random() - 0.5) * 0.02,
+                z: (Math.random() - 0.5) * 0.02
             });
         }
         particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1)); // シェーダーで使うわけではないがデータとして保持
+
         const particleMaterial = new THREE.PointsMaterial({
-            color: COLORS.white,
-            size: 0.2,
+            color: COLORS.star,
+            size: 0.2, // 基本サイズ
             transparent: true,
-            opacity: 0.5,
-            blending: THREE.AdditiveBlending
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true
         });
         const particles = new THREE.Points(particleGeometry, particleMaterial);
         scene.add(particles);
@@ -206,7 +217,6 @@
         let isAudioPlaying = false;
         let audioSource;
 
-        // UI Event
         const fileInput = document.getElementById('file-input');
         const statusDiv = document.getElementById('status');
         const btn = document.querySelector('.btn');
@@ -217,7 +227,7 @@
 
             btn.textContent = "Loading...";
             statusDiv.style.opacity = 1;
-            statusDiv.textContent = "Processing Audio Data...";
+            statusDiv.textContent = "Analyzing Frequency...";
 
             if (audioContext) audioContext.close();
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -249,9 +259,6 @@
             reader.readAsArrayBuffer(file);
         });
 
-        // --- カメラシェイク用変数 ---
-        let shakeIntensity = 0;
-
         // --- アニメーションループ ---
         const clock = new THREE.Clock();
 
@@ -259,39 +266,39 @@
             requestAnimationFrame(animate);
 
             const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+            
             let bassLevel = 0;
             let midHighLevel = 0;
 
             if (isAudioPlaying && analyser) {
                 analyser.getByteFrequencyData(dataArray);
-                const bufferLength = analyser.frequencyBinCount;
                 
                 // 低音 (Bass)
                 let bassSum = 0;
                 for(let i = 0; i < 20; i++) bassSum += dataArray[i];
-                bassLevel = bassSum / 20; // 0-255
+                bassLevel = bassSum / 20;
 
                 // 中高音 (Mid-High)
                 let midHighSum = 0;
                 for(let i = 100; i < 500; i++) midHighSum += dataArray[i];
-                midHighLevel = midHighSum / 400; // 0-255
+                midHighLevel = midHighSum / 400;
             }
 
-            // 1. メインオブジェクトの変形 (Vertex Displacement)
+            // 1. メインオブジェクトの変形 (Mild)
             const positions = geometryMain.attributes.position.array;
             const originalPositions = geometryMain.userData.originalPositions;
             
-            // 【修正】感度調整: 係数を大幅に下げて変形をマイルドにする
-            const displacementScale = Math.max(0, (midHighLevel - 40) / 255) * 2.5; 
+            const displacementScale = Math.max(0, (midHighLevel - 40) / 255) * 3.0; 
 
             for(let i = 0; i < positions.length; i += 3) {
                 const ox = originalPositions[i];
                 const oy = originalPositions[i+1];
                 const oz = originalPositions[i+2];
 
-                const noise = Math.sin(i * 0.1 + clock.getElapsedTime() * 3) * 0.5 + 0.5; // ノイズの速度も少し落とす
-                // 変形係数
-                const amount = 1 + (displacementScale * noise * (Math.random() > 0.5 ? 1.2 : 0.8));
+                // 波打つような動き（Cosmic Wave）
+                const noise = Math.sin(i * 0.05 + elapsedTime * 2) * 0.5 + 0.5;
+                const amount = 1 + (displacementScale * noise * 0.8);
 
                 positions[i] = ox * amount;
                 positions[i+1] = oy * amount;
@@ -301,67 +308,55 @@
 
             // マテリアル発光制御
             if (bassLevel > 180) {
-                materialMain.color.lerp(new THREE.Color(COLORS.white), 0.5); // 完全に白にせずLerpで和らげる
-                materialMain.opacity = 0.9;
+                materialMain.color.lerp(new THREE.Color(COLORS.white), 0.4);
+                materialMain.opacity = 1.0;
             } else {
                 materialMain.color.lerp(new THREE.Color(COLORS.cyan), 0.1);
-                materialMain.opacity = 0.4 + (bassLevel / 255) * 0.3;
+                materialMain.opacity = 0.5 + (bassLevel / 255) * 0.3;
             }
 
-            // 2. インナーコアの鼓動 (Scale Pulse)
-            // 【修正】最大スケールを抑える
-            const scale = 1 + (bassLevel / 255) * 0.6; 
+            // 2. インナーコアの鼓動 & 色変化
+            // ピンクではなく、強い水色〜白の間で変化させる
+            const scale = 1 + (bassLevel / 255) * 0.5; 
             innerCore.scale.set(scale, scale, scale);
             
-            // 色味の変化
-            const coreColor = new THREE.Color(COLORS.magenta);
-            if(bassLevel > 200) coreColor.setHex(0xff0088);
-            innerCore.material.color.lerp(coreColor, 0.15);
+            // ビートが強いときは白く光り、通常はネオン水色
+            const targetCoreColor = (bassLevel > 200) ? new THREE.Color(COLORS.white) : new THREE.Color(COLORS.coreBlue);
+            innerCore.material.color.lerp(targetCoreColor, 0.2);
 
-            // 3. パーティクルアニメーション
+            // 3. パーティクル（星空）アニメーション
             const pPos = particleGeometry.attributes.position.array;
+            
+            // 星空全体をゆっくり回転させる（銀河の回転）
+            particles.rotation.y = elapsedTime * 0.05;
+
             for(let i = 0; i < particleCount; i++) {
-                // 【修正】拡散速度の加速を抑える
-                const speedMult = 1 + (bassLevel / 255) * 1.0;
+                // 音に合わせて少し揺らぐ
+                const shake = (bassLevel / 255) * 0.05;
                 
-                pPos[i*3] += particleVelocities[i].x * speedMult;
-                pPos[i*3+1] += particleVelocities[i].y * speedMult;
-                pPos[i*3+2] += particleVelocities[i].z * speedMult;
-
-                const dist = Math.sqrt(pPos[i*3]**2 + pPos[i*3+1]**2 + pPos[i*3+2]**2);
-                if (dist > 80) {
-                    const r = 20;
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.acos((Math.random() * 2) - 1);
-                    pPos[i*3] = r * Math.sin(phi) * Math.cos(theta);
-                    pPos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-                    pPos[i*3+2] = r * Math.cos(phi);
-                }
-            }
-            particleGeometry.attributes.position.needsUpdate = true;
-            particles.material.size = 0.2 + (midHighLevel / 255) * 0.3; // サイズ変化も少し抑える
-
-            // 4. カメラシェイク
-            if (bassLevel > 235) { // しきい値を少し上げて反応頻度を下げる
-                shakeIntensity = 0.5; // 【修正】揺れ幅を小さくする
-            }
-
-            if (shakeIntensity > 0) {
-                const rx = (Math.random() - 0.5) * shakeIntensity;
-                const ry = (Math.random() - 0.5) * shakeIntensity;
-                const rz = (Math.random() - 0.5) * shakeIntensity;
-                
-                camera.position.add(new THREE.Vector3(rx, ry, rz));
-                
-                shakeIntensity *= 0.85; // 減衰を早める
-                if (shakeIntensity < 0.05) shakeIntensity = 0;
+                // 本来の位置から少しずらすのではなく、速度を加算して動かす
+                // ここではシンプルにY軸回転しているので、個別の動きは微細な振動のみにする
+                // 星の瞬きをサイズ変更で表現
+                // (PointsMaterialのsizeは全体一括なので、ここでは明滅は見送り、動きだけ)
             }
             
-            // 5. 自動回転速度の調整
+            // 音に合わせてパーティクル全体のサイズを変える（星の瞬き風）
+            particles.material.size = 0.2 + (midHighLevel / 255) * 0.2;
+
+            // 4. カメラシェイク (Mild)
+            if (bassLevel > 240) {
+                const shakeIntensity = 0.2;
+                camera.position.add(new THREE.Vector3(
+                    (Math.random()-0.5)*shakeIntensity, 
+                    (Math.random()-0.5)*shakeIntensity, 
+                    (Math.random()-0.5)*shakeIntensity
+                ));
+            }
+            
+            // 5. 自動回転速度
             controls.update();
             const avgLevel = (bassLevel + midHighLevel) / 2;
-            // 【修正】回転速度の最大値を抑える
-            controls.autoRotateSpeed = 1.0 + (avgLevel / 255) * 4.0;
+            controls.autoRotateSpeed = 0.5 + (avgLevel / 255) * 3.0;
 
             composer.render();
         }
