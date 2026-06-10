@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Typo Extractor</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { font-size: 1.5rem; color: #102a43; margin-bottom: 8px; }
+        p.description { color: #627d98; font-size: 0.9rem; margin-bottom: 20px; }
+        
+        #status {
+            display: inline-block;
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        #status.ready { background-color: #d4edda; color: #155724; }
+        #status.processing { background-color: #cce5ff; color: #004085; }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            transition: all 0.2s;
+            margin: 5px;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-blue { background-color: #3498db; }
+        .btn-purple { background-color: #9b59b6; }
+        .btn-green { background-color: #2ecc71; text-decoration: none; }
+        .btn.disabled { background-color: #bdc3c7; pointer-events: none; }
+        input[type="file"] { display: none; }
+
+        .image-wrapper {
+            margin: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        img, canvas {
+            max-width: 100%;
+            border-radius: 8px;
+            border: 1px solid #e1e8ed;
+            background-image: radial-gradient(#d7e1ea 1px, transparent 1px);
+            background-size: 10px 10px; /* 透過背景がわかる模様 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>AI Typo Extractor</h1>
+        <p class="description">AIが自動で背景を削除し、文字のグラフィックだけを抽出します</p>
+        
+        <div id="status">システムを準備中...</div>
+        <br>
+        
+        <label id="uploadLabel" class="btn btn-blue disabled">
+            1. 写真をアップロード
+            <input type="file" id="fileInput" accept="image/*" disabled>
+        </label>
+
+        <button id="aiExtractBtn" class="btn btn-purple disabled" style="display:none;">
+            2. AIで文字だけを切り抜く✨
+        </button>
+
+        <div class="image-wrapper">
+            <img id="originalImage" style="display:none;" />
+            <img id="aiResultImage" style="display:none;" />
+            <canvas id="hiddenCanvas" style="display:none;"></canvas>
+            
+            <a id="downloadLink" class="btn btn-green" style="display:none;">3. SVGスタンプを保存</a>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@imgly/background-removal@1.4.5/dist/browser/background-removal.js"></script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadLabel = document.getElementById('uploadLabel');
+        const aiExtractBtn = document.getElementById('aiExtractBtn');
+        const statusText = document.getElementById('status');
+        const originalImage = document.getElementById('originalImage');
+        const aiResultImage = document.getElementById('aiResultImage');
+        const downloadLink = document.getElementById('downloadLink');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+
+        let selectedFile = null;
+        let isCvReady = false;
+
+        // OpenCVの準備完了を待つ
+        function onOpenCvReady() {
+            isCvReady = true;
+            statusText.textContent = '準備完了！画像をアップロードしてください';
+            statusText.className = 'ready';
+            uploadLabel.classList.remove('disabled');
+            fileInput.disabled = false;
+        }
+
+        // 1. 画像が選択された時
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (!selectedFile) return;
+
+            // UIリセット
+            aiResultImage.style.display = 'none';
+            downloadLink.style.display = 'none';
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImage.src = event.target.result;
+                originalImage.style.display = 'block';
+                aiExtractBtn.style.display = 'inline-block';
+                aiExtractBtn.classList.remove('disabled');
+                statusText.textContent = '「AIで切り抜く」ボタンを押してください';
+            };
+            reader.readAsDataURL(selectedFile);
+        });
+
+        // 2. AI抽出ボタンが押された時
+        aiExtractBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            aiExtractBtn.classList.add('disabled');
+            statusText.textContent = 'AIが背景を削除中...(初回はモデルのDLに数秒かかります) ⏳';
+            statusText.className = 'processing';
+
+            try {
+                // 魔法のコード：AIに画像を渡して背景を消してもらう
+                const imageBlob = await imglyRemoveBackground(selectedFile);
+                
+                // 切り抜き後の画像（背景透過PNG）を表示
+                const objectURL = URL.createObjectURL(imageBlob);
+                aiResultImage.src = objectURL;
+                originalImage.style.display = 'none';
+                aiResultImage.style.display = 'block';
+
+                statusText.textContent = 'AI切り抜き完了！SVGを生成しています...';
+                
+                // SVG化処理へ進む
+                aiResultImage.onload = () => generateSVGFromTransparentImage(aiResultImage);
+
+            } catch (error) {
+                console.error(error);
+                statusText.textContent = 'AIの処理に失敗しました。';
+                statusText.className = '';
+            }
+        });
+
+        // 3. 透過画像からSVGを生成する処理
+        function generateSVGFromTransparentImage(imgElement) {
+            if (!isCvReady) return;
+
+            try {
+                // AIが生成した画像をCanvasに描画
+                hiddenCanvas.width = imgElement.naturalWidth;
+                hiddenCanvas.height = imgElement.naturalHeight;
+                const ctx = hiddenCanvas.getContext('2d');
+                ctx.drawImage(imgElement, 0, 0);
+
+                // OpenCVで画像を読み込む (RGBA形式)
+                let src = cv.imread(hiddenCanvas);
+                
+                // ★超重要テクニック★
+                // AIが背景を透明にしてくれたので、複雑な2値化は不要！
+                // 「透明じゃない部分（アルファチャンネル）」だけを抽出すれば完璧なシルエットになる
+                let channels = new cv.MatVector();
+                cv.split(src, channels);
+                let alphaChannel = channels.get(3); // 4番目のチャンネルが透明度(Alpha)
+
+                // 透明度が0より大きい（＝文字が存在する）部分を白(255)にする
+                let thresh = new cv.Mat();
+                cv.threshold(alphaChannel, thresh, 10, 255, cv.THRESH_BINARY);
+
+                // 輪郭を抽出
+                let contours = new cv.MatVector();
+                let hierarchy = new cv.Mat();
+                cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+                // SVGの生成
+                let svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n`;
+                svgContent += `<svg width="${src.cols}" height="${src.rows}" viewBox="0 0 ${src.cols} ${src.rows}" xmlns="http://www.w3.org/2000/svg">\n`;
+                
+                for (let i = 0; i < contours.size(); ++i) {
+                    let contour = contours.get(i);
+                    // ゴミを無視
+                    if (cv.contourArea(contour) < 50) continue;
+
+                    let pathData = "M ";
+                    let pointsData = contour.data32S; 
+                    
+                    for (let j = 0; j < pointsData.length; j += 2) {
+                        let x = pointsData[j];
+                        let y = pointsData[j+1];
+                        if (j === 0) pathData += `${x} ${y} `;
+                        else pathData += `L ${x} ${y} `;
+                    }
+                    pathData += "Z";
+                    // スタンプ風に黒で塗りつぶす
+                    svgContent += `  <path d="${pathData}" fill="#102a43" />\n`;
+                }
+                svgContent += '</svg>';
+
+                // ダウンロードリンクの作成
+                const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.download = "typo_stamp.svg";
+                
+                // UI更新
+                downloadLink.style.display = 'inline-block';
+                statusText.textContent = '完成！スタンプデータをダウンロードできます 🎉';
+                statusText.className = 'ready';
+
+                // メモリ解放
+                src.delete(); channels.delete(); alphaChannel.delete(); 
+                thresh.delete(); contours.delete(); hierarchy.delete();
+
+            } catch (error) {
+                console.error(error);
+                statusText.textContent = 'SVG化に失敗しました。';
+                statusText.className = '';
+            }
+        }
+    </script>
+</body>
+</html>
