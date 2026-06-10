@@ -1,374 +1,221 @@
-!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cosmic Audio Visualizer</title>
+    <title>街角写取録 - Prototype</title>
     <style>
+        /* CSS：デザインの指定（スイスデザイン・ミニマル） */
+        :root {
+            --bg-color: #F5F5F5;
+            --card-bg: #FFFFFF;
+            --text-main: #1A1A1A;
+            --text-sub: #888888;
+            --divider: #EEEEEE;
+        }
+
         body {
             margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 0;
+            background-color: #E0E0E0; /* PCで見た時の外側の背景色 */
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
 
-        /* 背景：深宇宙のような漆黒からダークブルーへのグラデーション */
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            background: radial-gradient(circle at center, #050510 0%, #000000 100%);
+        /* スマホの画面サイズを模したフレーム */
+        .mobile-frame {
+            width: 390px;
+            height: 844px; /* iPhone 13/14のサイズ目安 */
+            background-color: var(--bg-color);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-radius: 40px;
+            overflow-y: auto; /* スクロール可能に */
+            position: relative;
+            border: 8px solid #333; /* スマホのベゼル風 */
         }
 
-        /* UI: SF映画風ガラスモーフィズムボタン */
-        #ui-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
+        /* ヘッダー部分 */
+        .header {
+            padding: 60px 24px 20px;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--divider);
+            position: sticky;
+            top: 0;
             z-index: 10;
         }
 
-        .upload-btn-wrapper {
-            position: relative;
-            overflow: hidden;
-            display: inline-block;
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            letter-spacing: 1.5px;
         }
 
-        .btn {
-            border: 2px solid #00ffff;
-            color: #00ffff;
-            background-color: rgba(0, 20, 40, 0.4); /* 青みを帯びた黒 */
-            padding: 12px 30px;
-            font-size: 16px;
-            font-weight: bold;
-            text-transform: uppercase;
+        .header p {
+            margin: 8px 0 0;
+            font-size: 10px;
+            color: var(--text-sub);
             letter-spacing: 2px;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 4px;
-            box-shadow: 0 0 10px #00ffff, inset 0 0 5px #00ffff;
-            transition: all 0.3s ease;
-            text-shadow: 0 0 5px #00ffff;
+            font-family: 'Courier New', Courier, monospace;
         }
 
-        .btn:hover {
-            background-color: rgba(0, 255, 255, 0.15);
-            box-shadow: 0 0 20px #00ffff, inset 0 0 10px #00ffff;
+        /* コンテンツエリア */
+        .content {
+            padding: 24px 0;
         }
 
-        .upload-btn-wrapper input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
+        /* 標本カードのデザイン */
+        .specimen-card {
+            width: 90%;
+            margin: 0 auto 32px;
+            background-color: var(--card-bg);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
         }
 
-        #status {
-            margin-top: 10px;
-            color: #88ffff; /* 文字色も水色系に */
-            font-size: 12px;
-            text-shadow: 0 0 3px #00ffff;
-            opacity: 0;
-            transition: opacity 0.5s;
+        .image-canvas {
+            width: 100%;
+            aspect-ratio: 1 / 1; /* 正方形 */
+            background-color: #F9F9F9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+
+        .image-canvas img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: grayscale(100%) contrast(120%); /* 画像を白黒スタンプ風に加工 */
+            mix-blend-mode: multiply;
+        }
+
+        .meta-container {
+            padding: 24px;
+        }
+
+        .comment {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: var(--divider);
+            margin-bottom: 16px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .label {
+            font-size: 10px;
+            color: var(--text-sub);
+            letter-spacing: 1.2px;
+        }
+
+        .value {
+            font-size: 11px;
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* スクロールバーを隠す（スマホライクに） */
+        .mobile-frame::-webkit-scrollbar {
+            display: none;
         }
     </style>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-            }
-        }
-    </script>
 </head>
 <body>
 
-    <div id="ui-container">
-        <div class="upload-btn-wrapper">
-            <button class="btn">Upload Audio</button>
-            <input type="file" id="file-input" accept="audio/*" />
+    <div class="mobile-frame">
+        
+        <div class="header">
+            <h1>MACHIKADO ARCHIVE</h1>
+            <p>3 SPECIMENS COLLECTED</p>
         </div>
-        <div id="status">System Standby...</div>
+
+        <div class="content">
+            
+            <div class="specimen-card">
+                <div class="image-canvas">
+                    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop" alt="スタンプ画像">
+                </div>
+                <div class="meta-container">
+                    <p class="comment">"絶妙に傾いている非常口のピクトグラム。少し焦って見える。"</p>
+                    <div class="divider"></div>
+                    <div class="data-row">
+                        <span class="label">LOCATION</span>
+                        <span class="value">Shibuya, Tokyo</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">COORDINATES</span>
+                        <span class="value">35.6619°, 139.7009°</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">DATE</span>
+                        <span class="value">2026.06.10</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="specimen-card">
+                <div class="image-canvas">
+                    <img src="https://images.unsplash.com/photo-1550684376-efcbd6e3f031?q=80&w=800&auto=format&fit=crop" alt="スタンプ画像">
+                </div>
+                <div class="meta-container">
+                    <p class="comment">"錆びたシャッターに描かれた、謎の丸いタイポグラフィ。"</p>
+                    <div class="divider"></div>
+                    <div class="data-row">
+                        <span class="label">LOCATION</span>
+                        <span class="value">Nakameguro, Tokyo</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">COORDINATES</span>
+                        <span class="value">35.6446°, 139.6987°</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">DATE</span>
+                        <span class="value">2026.06.09</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="specimen-card">
+                <div class="image-canvas">
+                    <img src="https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?q=80&w=800&auto=format&fit=crop" alt="スタンプ画像">
+                </div>
+                <div class="meta-container">
+                    <p class="comment">"午後3時、看板の影が落ちて偶然できた完璧な三角形。"</p>
+                    <div class="divider"></div>
+                    <div class="data-row">
+                        <span class="label">LOCATION</span>
+                        <span class="value">Daikanyama, Tokyo</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">COORDINATES</span>
+                        <span class="value">35.6489°, 139.7031°</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="label">DATE</span>
+                        <span class="value">2026.06.08</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <div id="canvas-container"></div>
-
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-
-        // --- 設定定数 ---
-        const COLORS = {
-            cyan: 0x00ffff,      // 外側のワイヤーフレーム
-            coreBlue: 0x44ffff,  // インナーコア（ネオン水色）
-            white: 0xffffff,     // 発光時の白
-            star: 0xaaddff       // 星（わずかに青白い）
-        };
-
-        // --- シーン初期化 ---
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        // 宇宙の奥行きを出すためにFogを追加（遠くを暗くする）
-        scene.fog = new THREE.FogExp2(0x000000, 0.015);
-        
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 30;
-
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.toneMapping = THREE.ReinhardToneMapping;
-        container.appendChild(renderer.domElement);
-
-        // --- コントロール ---
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.8; // 宇宙的なゆっくりした回転
-
-        // --- ポストプロセス (Bloom) ---
-        const renderScene = new RenderPass(scene, camera);
-        // 宇宙の輝きを表現するためBloomを少し調整
-        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-        bloomPass.strength = 2.2; // 輝き
-        bloomPass.radius = 0.6;
-        bloomPass.threshold = 0.1;
-
-        const composer = new EffectComposer(renderer);
-        composer.addPass(renderScene);
-        composer.addPass(bloomPass);
-
-        // --- オブジェクト作成 ---
-
-        // 1. メインオブジェクト: ワイヤーフレーム球体
-        const geometryMain = new THREE.IcosahedronGeometry(10, 5); // 詳細度を少し上げる
-        geometryMain.userData.originalPositions = geometryMain.attributes.position.array.slice(); 
-        
-        const materialMain = new THREE.MeshBasicMaterial({ 
-            color: COLORS.cyan, 
-            wireframe: true,
-            transparent: true,
-            opacity: 0.6 // 少し透明度を上げて繊細に
-        });
-        const mainSphere = new THREE.Mesh(geometryMain, materialMain);
-        scene.add(mainSphere);
-
-        // 2. インナーコア: 色をピンクからネオン水色に変更
-        const geometryCore = new THREE.SphereGeometry(3.5, 64, 64); // 少し小さく高精細に
-        const materialCore = new THREE.MeshBasicMaterial({ 
-            color: COLORS.coreBlue // ネオン水色
-        });
-        const innerCore = new THREE.Mesh(geometryCore, materialCore);
-        scene.add(innerCore);
-
-        // 3. パーティクルシステム（星空）
-        // 宇宙空間っぽくするために数を増やし、範囲を広げる
-        const particleCount = 1500;
-        const particleGeometry = new THREE.BufferGeometry();
-        const particlePositions = new Float32Array(particleCount * 3);
-        const particleSizes = new Float32Array(particleCount); // 星の大きさのばらつき用
-        const particleVelocities = [];
-
-        for(let i = 0; i < particleCount; i++) {
-            // 範囲を広く取る (半径20〜100)
-            const r = 20 + Math.random() * 80;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos((Math.random() * 2) - 1);
-            
-            const x = r * Math.sin(phi) * Math.cos(theta);
-            const y = r * Math.sin(phi) * Math.sin(theta);
-            const z = r * Math.cos(phi);
-
-            particlePositions[i * 3] = x;
-            particlePositions[i * 3 + 1] = y;
-            particlePositions[i * 3 + 2] = z;
-
-            // 星のサイズをランダムに
-            particleSizes[i] = Math.random() * 0.3 + 0.1;
-
-            // ゆっくり流れる動き
-            particleVelocities.push({
-                x: (Math.random() - 0.5) * 0.02,
-                y: (Math.random() - 0.5) * 0.02,
-                z: (Math.random() - 0.5) * 0.02
-            });
-        }
-        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-        particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1)); // シェーダーで使うわけではないがデータとして保持
-
-        const particleMaterial = new THREE.PointsMaterial({
-            color: COLORS.star,
-            size: 0.2, // 基本サイズ
-            transparent: true,
-            opacity: 0.8,
-            blending: THREE.AdditiveBlending,
-            sizeAttenuation: true
-        });
-        const particles = new THREE.Points(particleGeometry, particleMaterial);
-        scene.add(particles);
-
-        // --- Audio API Setup ---
-        let audioContext, analyser, dataArray;
-        let isAudioPlaying = false;
-        let audioSource;
-
-        const fileInput = document.getElementById('file-input');
-        const statusDiv = document.getElementById('status');
-        const btn = document.querySelector('.btn');
-
-        fileInput.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            btn.textContent = "Loading...";
-            statusDiv.style.opacity = 1;
-            statusDiv.textContent = "Analyzing Frequency...";
-
-            if (audioContext) audioContext.close();
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-            const reader = new FileReader();
-            reader.onload = function(ev) {
-                audioContext.decodeAudioData(ev.target.result, function(buffer) {
-                    if (audioSource) audioSource.stop();
-                    audioSource = audioContext.createBufferSource();
-                    audioSource.buffer = buffer;
-
-                    analyser = audioContext.createAnalyser();
-                    analyser.fftSize = 2048;
-                    
-                    audioSource.connect(analyser);
-                    analyser.connect(audioContext.destination);
-
-                    dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-                    audioSource.start(0);
-                    isAudioPlaying = true;
-                    btn.textContent = "Playing";
-                    statusDiv.textContent = "Visualizer Active";
-                }, function(e) {
-                    console.error("Error decoding audio data", e);
-                    btn.textContent = "Error";
-                });
-            };
-            reader.readAsArrayBuffer(file);
-        });
-
-        // --- アニメーションループ ---
-        const clock = new THREE.Clock();
-
-        function animate() {
-            requestAnimationFrame(animate);
-
-            const delta = clock.getDelta();
-            const elapsedTime = clock.getElapsedTime();
-            
-            let bassLevel = 0;
-            let midHighLevel = 0;
-
-            if (isAudioPlaying && analyser) {
-                analyser.getByteFrequencyData(dataArray);
-                
-                // 低音 (Bass)
-                let bassSum = 0;
-                for(let i = 0; i < 20; i++) bassSum += dataArray[i];
-                bassLevel = bassSum / 20;
-
-                // 中高音 (Mid-High)
-                let midHighSum = 0;
-                for(let i = 100; i < 500; i++) midHighSum += dataArray[i];
-                midHighLevel = midHighSum / 400;
-            }
-
-            // 1. メインオブジェクトの変形 (Mild)
-            const positions = geometryMain.attributes.position.array;
-            const originalPositions = geometryMain.userData.originalPositions;
-            
-            const displacementScale = Math.max(0, (midHighLevel - 40) / 255) * 3.0; 
-
-            for(let i = 0; i < positions.length; i += 3) {
-                const ox = originalPositions[i];
-                const oy = originalPositions[i+1];
-                const oz = originalPositions[i+2];
-
-                // 波打つような動き（Cosmic Wave）
-                const noise = Math.sin(i * 0.05 + elapsedTime * 2) * 0.5 + 0.5;
-                const amount = 1 + (displacementScale * noise * 0.8);
-
-                positions[i] = ox * amount;
-                positions[i+1] = oy * amount;
-                positions[i+2] = oz * amount;
-            }
-            geometryMain.attributes.position.needsUpdate = true;
-
-            // マテリアル発光制御
-            if (bassLevel > 180) {
-                materialMain.color.lerp(new THREE.Color(COLORS.white), 0.4);
-                materialMain.opacity = 1.0;
-            } else {
-                materialMain.color.lerp(new THREE.Color(COLORS.cyan), 0.1);
-                materialMain.opacity = 0.5 + (bassLevel / 255) * 0.3;
-            }
-
-            // 2. インナーコアの鼓動 & 色変化
-            // ピンクではなく、強い水色〜白の間で変化させる
-            const scale = 1 + (bassLevel / 255) * 0.5; 
-            innerCore.scale.set(scale, scale, scale);
-            
-            // ビートが強いときは白く光り、通常はネオン水色
-            const targetCoreColor = (bassLevel > 200) ? new THREE.Color(COLORS.white) : new THREE.Color(COLORS.coreBlue);
-            innerCore.material.color.lerp(targetCoreColor, 0.2);
-
-            // 3. パーティクル（星空）アニメーション
-            const pPos = particleGeometry.attributes.position.array;
-            
-            // 星空全体をゆっくり回転させる（銀河の回転）
-            particles.rotation.y = elapsedTime * 0.05;
-
-            for(let i = 0; i < particleCount; i++) {
-                // 音に合わせて少し揺らぐ
-                const shake = (bassLevel / 255) * 0.05;
-                
-                // 本来の位置から少しずらすのではなく、速度を加算して動かす
-                // ここではシンプルにY軸回転しているので、個別の動きは微細な振動のみにする
-                // 星の瞬きをサイズ変更で表現
-                // (PointsMaterialのsizeは全体一括なので、ここでは明滅は見送り、動きだけ)
-            }
-            
-            // 音に合わせてパーティクル全体のサイズを変える（星の瞬き風）
-            particles.material.size = 0.2 + (midHighLevel / 255) * 0.2;
-
-            // 4. カメラシェイク (Mild)
-            if (bassLevel > 240) {
-                const shakeIntensity = 0.2;
-                camera.position.add(new THREE.Vector3(
-                    (Math.random()-0.5)*shakeIntensity, 
-                    (Math.random()-0.5)*shakeIntensity, 
-                    (Math.random()-0.5)*shakeIntensity
-                ));
-            }
-            
-            // 5. 自動回転速度
-            controls.update();
-            const avgLevel = (bassLevel + midHighLevel) / 2;
-            controls.autoRotateSpeed = 0.5 + (avgLevel / 255) * 3.0;
-
-            composer.render();
-        }
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        animate();
-    </script>
 </body>
 </html>
