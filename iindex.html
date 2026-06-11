@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Typo Extractor</title>
+    <title>SVG Font Extractor (ZINE Creator Version)</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f0f4f8;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            background-color: #f4f7f6;
             color: #333;
             display: flex;
             justify-content: center;
@@ -16,18 +17,20 @@
             min-height: 100vh;
             padding: 20px;
         }
+
         .container {
             background: #ffffff;
             padding: 30px;
             border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-            max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            max-width: 900px;
             width: 100%;
             text-align: center;
         }
-        h1 { font-size: 1.5rem; color: #102a43; margin-bottom: 8px; }
-        p.description { color: #627d98; font-size: 0.9rem; margin-bottom: 20px; }
-        
+
+        h1 { font-size: 1.5rem; color: #2c3e50; margin-bottom: 8px; }
+        p.description { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 20px; }
+
         #status {
             display: inline-block;
             background-color: #fff3cd;
@@ -49,209 +52,470 @@
             cursor: pointer;
             font-weight: bold;
             border: none;
+            font-size: 1rem;
             transition: all 0.2s;
-            margin: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .btn:hover { transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
         .btn-blue { background-color: #3498db; }
-        .btn-purple { background-color: #9b59b6; }
+        .btn-blue:hover { background-color: #2980b9; }
         .btn-green { background-color: #2ecc71; text-decoration: none; }
-        .btn.disabled { background-color: #bdc3c7; pointer-events: none; }
+        .btn-green:hover { background-color: #27ae60; }
+        .btn-orange { background-color: #f15a24; margin-top: 15px;}
+        .btn-orange:hover { background-color: #e04f1a; }
+        .btn.disabled { background-color: #bdc3c7; cursor: not-allowed; transform: none; box-shadow: none; }
+        
         input[type="file"] { display: none; }
 
-        .image-wrapper {
+        /* クロッパー領域 */
+        .crop-container {
+            max-width: 100%;
+            height: 400px;
+            margin: 20px auto;
+            display: none;
+            background-color: #eee;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        img#imageToCrop { max-width: 100%; display: block; }
+
+        /* ★ZINE用テキスト入力フォームのスタイル */
+        .zine-form-section {
+            display: none;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
             margin: 20px 0;
+            text-align: left;
+        }
+        .zine-form-section h3 {
+            font-size: 1rem;
+            color: #475569;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 5px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+        .form-group label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: #334155;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #f15a24;
+        }
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .color-picker-wrapper input[type="color"] {
+            width: 40px;
+            height: 35px;
+            padding: 0;
+            border: none;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        /* プレビュー領域 */
+        .preview-area {
+            margin-top: 30px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            border-top: 2px dashed #eee;
+            padding-top: 20px;
+        }
+        #canvasOutput {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #e1e8ed;
+            margin-bottom: 20px;
+        }
+
+        /* ★ZINEギャラリー（記録スタンプ）のスタイル */
+        .stamp-gallery-section {
+            margin-top: 40px;
+            border-top: 2px solid #e1e8ed;
+            padding-top: 25px;
+            text-align: left;
+        }
+        .stamp-gallery-title {
+            font-size: 1.1rem;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .stamp-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .stamp-card {
+            background: #fff;
+            border: 1px solid #e1e8ed;
+            border-radius: 12px;
+            padding: 12px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+            width: 260px; /* 横長カードに合わせる */
+            transition: all 0.2s;
         }
-        img, canvas {
-            max-width: 100%;
-            border-radius: 8px;
-            border: 1px solid #e1e8ed;
-            background-image: radial-gradient(#d7e1ea 1px, transparent 1px);
-            background-size: 10px 10px; /* 透過背景がわかる模様 */
+        .stamp-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.08);
+        }
+        .stamp-thumb {
+            width: 100%;
+            height: 160px;
+            object-fit: contain;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid #f0f0f0;
+            background: #fafafa;
+        }
+        .btn-sm {
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            width: 100%;
+            text-align: center;
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>AI Typo Extractor</h1>
-        <p class="description">AIが自動で背景を削除し、文字のグラフィックだけを抽出します</p>
+        <h1>SVG Font Extractor & ZINE Creator</h1>
+        <p class="description">画像をアップロードして範囲を選択し、ZINEの1ページを生成します</p>
         
-        <div id="status">システムを準備中...</div>
+        <div id="status">OpenCV.js を読み込み中...</div>
         <br>
         
         <label id="uploadLabel" class="btn btn-blue disabled">
-            1. 写真をアップロード
+            画像を選択する
             <input type="file" id="fileInput" accept="image/*" disabled>
         </label>
 
-        <button id="aiExtractBtn" class="btn btn-purple disabled" style="display:none;">
-            2. AIで文字だけを切り抜く✨
-        </button>
+        <div id="cropContainer" class="crop-container">
+            <img id="imageToCrop" src="" alt="Picture">
+        </div>
 
-        <div class="image-wrapper">
-            <img id="originalImage" style="display:none;" />
-            <img id="aiResultImage" style="display:none;" />
-            <canvas id="hiddenCanvas" style="display:none;"></canvas>
-            
-            <a id="downloadLink" class="btn btn-green" style="display:none;">3. SVGスタンプを保存</a>
+        <div id="zineFormSection" class="zine-form-section">
+            <h3>ZINE ページテキスト設定</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="inputHashtag">誌名 / ハッシュタグ</label>
+                    <input type="text" id="inputHashtag" value="#街角写取録">
+                </div>
+                <div class="form-group">
+                    <label for="inputNumber">通し番号</label>
+                    <input type="text" id="inputNumber" value="01">
+                </div>
+                <div class="form-group">
+                    <label for="inputLocation">採取地 (左下)</label>
+                    <input type="text" id="inputLocation" value="新宿区水道町">
+                </div>
+                <div class="form-group">
+                    <label for="inputMemo">一言メモ (右下)</label>
+                    <input type="text" id="inputMemo" value="裏ドアまで可愛い">
+                </div>
+                <div class="form-group full-width">
+                    <label for="themeColor">テーマカラー（グラフィック・文字色）</label>
+                    <div class="color-picker-wrapper">
+                        <input type="color" id="themeColor" value="#f15a24">
+                        <span style="font-size: 0.85rem; color: #64748b;">サンプルの美しい朱色にセットされています</span>
+                    </div>
+                </div>
+            </div>
+            <button id="extractBtn" class="btn btn-orange" style="width: 100%;">選択範囲からZINEページを生成・記録</button>
+        </div>
+
+        <div id="previewArea" class="preview-area">
+            <h3 style="font-size: 1rem; color: #34495e; margin-bottom: 12px;">現在の2値化プレビュー (輪郭抽出確認用)</h3>
+            <canvas id="canvasOutput"></canvas>
+        </div>
+
+        <div class="stamp-gallery-section">
+            <h2 class="stamp-gallery-title">生成されたZINEページ一覧</h2>
+            <div id="stampList" class="stamp-list">
+                </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/@imgly/background-removal@1.4.5/dist/browser/background-removal.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 
     <script>
         const fileInput = document.getElementById('fileInput');
         const uploadLabel = document.getElementById('uploadLabel');
-        const aiExtractBtn = document.getElementById('aiExtractBtn');
         const statusText = document.getElementById('status');
-        const originalImage = document.getElementById('originalImage');
-        const aiResultImage = document.getElementById('aiResultImage');
-        const downloadLink = document.getElementById('downloadLink');
-        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        const cropContainer = document.getElementById('cropContainer');
+        const imageToCrop = document.getElementById('imageToCrop');
+        const zineFormSection = document.getElementById('zineFormSection');
+        const extractBtn = document.getElementById('extractBtn');
+        const previewArea = document.getElementById('previewArea');
+        const stampList = document.getElementById('stampList');
 
-        let selectedFile = null;
-        let isCvReady = false;
+        let cropper = null;
 
-        // OpenCVの準備完了を待つ
         function onOpenCvReady() {
-            isCvReady = true;
-            statusText.textContent = '準備完了！画像をアップロードしてください';
+            statusText.textContent = '準備完了';
             statusText.className = 'ready';
             uploadLabel.classList.remove('disabled');
             fileInput.disabled = false;
         }
 
-        // 1. 画像が選択された時
         fileInput.addEventListener('change', (e) => {
-            selectedFile = e.target.files[0];
-            if (!selectedFile) return;
+            const file = e.target.files[0];
+            if (!file) return;
 
-            // UIリセット
-            aiResultImage.style.display = 'none';
-            downloadLink.style.display = 'none';
-            
+            previewArea.style.display = 'none';
+            statusText.textContent = '範囲を選択し、テキストを入力して生成してください';
+            statusText.className = 'ready';
+
             const reader = new FileReader();
             reader.onload = function(event) {
-                originalImage.src = event.target.result;
-                originalImage.style.display = 'block';
-                aiExtractBtn.style.display = 'inline-block';
-                aiExtractBtn.classList.remove('disabled');
-                statusText.textContent = '「AIで切り抜く」ボタンを押してください';
-            };
-            reader.readAsDataURL(selectedFile);
-        });
+                imageToCrop.src = event.target.result;
+                cropContainer.style.display = 'block';
+                zineFormSection.style.display = 'block';
 
-        // 2. AI抽出ボタンが押された時
-        aiExtractBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            aiExtractBtn.classList.add('disabled');
-            statusText.textContent = 'AIが背景を削除中...(初回はモデルのDLに数秒かかります) ⏳';
-            statusText.className = 'processing';
-
-            try {
-                // 魔法のコード：AIに画像を渡して背景を消してもらう
-                const imageBlob = await imglyRemoveBackground(selectedFile);
-                
-                // 切り抜き後の画像（背景透過PNG）を表示
-                const objectURL = URL.createObjectURL(imageBlob);
-                aiResultImage.src = objectURL;
-                originalImage.style.display = 'none';
-                aiResultImage.style.display = 'block';
-
-                statusText.textContent = 'AI切り抜き完了！SVGを生成しています...';
-                
-                // SVG化処理へ進む
-                aiResultImage.onload = () => generateSVGFromTransparentImage(aiResultImage);
-
-            } catch (error) {
-                console.error(error);
-                statusText.textContent = 'AIの処理に失敗しました。';
-                statusText.className = '';
-            }
-        });
-
-        // 3. 透過画像からSVGを生成する処理
-        function generateSVGFromTransparentImage(imgElement) {
-            if (!isCvReady) return;
-
-            try {
-                // AIが生成した画像をCanvasに描画
-                hiddenCanvas.width = imgElement.naturalWidth;
-                hiddenCanvas.height = imgElement.naturalHeight;
-                const ctx = hiddenCanvas.getContext('2d');
-                ctx.drawImage(imgElement, 0, 0);
-
-                // OpenCVで画像を読み込む (RGBA形式)
-                let src = cv.imread(hiddenCanvas);
-                
-                // ★超重要テクニック★
-                // AIが背景を透明にしてくれたので、複雑な2値化は不要！
-                // 「透明じゃない部分（アルファチャンネル）」だけを抽出すれば完璧なシルエットになる
-                let channels = new cv.MatVector();
-                cv.split(src, channels);
-                let alphaChannel = channels.get(3); // 4番目のチャンネルが透明度(Alpha)
-
-                // 透明度が0より大きい（＝文字が存在する）部分を白(255)にする
-                let thresh = new cv.Mat();
-                cv.threshold(alphaChannel, thresh, 10, 255, cv.THRESH_BINARY);
-
-                // 輪郭を抽出
-                let contours = new cv.MatVector();
-                let hierarchy = new cv.Mat();
-                cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-                // SVGの生成
-                let svgContent = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n`;
-                svgContent += `<svg width="${src.cols}" height="${src.rows}" viewBox="0 0 ${src.cols} ${src.rows}" xmlns="http://www.w3.org/2000/svg">\n`;
-                
-                for (let i = 0; i < contours.size(); ++i) {
-                    let contour = contours.get(i);
-                    // ゴミを無視
-                    if (cv.contourArea(contour) < 50) continue;
-
-                    let pathData = "M ";
-                    let pointsData = contour.data32S; 
-                    
-                    for (let j = 0; j < pointsData.length; j += 2) {
-                        let x = pointsData[j];
-                        let y = pointsData[j+1];
-                        if (j === 0) pathData += `${x} ${y} `;
-                        else pathData += `L ${x} ${y} `;
-                    }
-                    pathData += "Z";
-                    // スタンプ風に黒で塗りつぶす
-                    svgContent += `  <path d="${pathData}" fill="#102a43" />\n`;
+                if (cropper) {
+                    cropper.destroy();
                 }
-                svgContent += '</svg>';
 
-                // ダウンロードリンクの作成
-                const blob = new Blob([svgContent], {type: "image/svg+xml;charset=utf-8"});
-                const url = URL.createObjectURL(blob);
-                downloadLink.href = url;
-                downloadLink.download = "typo_stamp.svg";
-                
-                // UI更新
-                downloadLink.style.display = 'inline-block';
-                statusText.textContent = '完成！スタンプデータをダウンロードできます 🎉';
-                statusText.className = 'ready';
+                cropper = new Cropper(imageToCrop, {
+                    viewMode: 1,
+                    autoCropArea: 0.8,
+                    background: false,
+                    zoomable: false
+                });
+            };
+            reader.readAsDataURL(file);
+        });
 
-                // メモリ解放
-                src.delete(); channels.delete(); alphaChannel.delete(); 
-                thresh.delete(); contours.delete(); hierarchy.delete();
+        extractBtn.addEventListener('click', () => {
+            if (!cropper) return;
 
-            } catch (error) {
-                console.error(error);
-                statusText.textContent = 'SVG化に失敗しました。';
-                statusText.className = '';
-            }
-        }
+            statusText.textContent = 'ZINEページを生成中...';
+            statusText.className = 'processing';
+            
+            setTimeout(() => {
+                try {
+                    const croppedCanvas = cropper.getCroppedCanvas();
+                    
+                    let src = cv.imread(croppedCanvas);
+                    let gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+                    let blurred = new cv.Mat();
+                    let ksize = new cv.Size(5, 5);
+                    cv.GaussianBlur(gray, blurred, ksize, 0, 0, cv.BORDER_DEFAULT);
+
+                    let thresh = new cv.Mat();
+                    cv.threshold(blurred, thresh, 150, 255, cv.THRESH_BINARY);
+
+                    // 2値化の確認表示
+                    cv.imshow('canvasOutput', thresh);
+
+                    let contours = new cv.MatVector();
+                    let hierarchy = new cv.Mat();
+                    cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+                    // 外接矩形の全体サイズを計算（パーツ全体のバウンディングボックス）
+                    let minX = Infinity, minY = Infinity;
+                    let maxX = -Infinity, maxY = -Infinity;
+                    let validContours = [];
+
+                    for (let i = 0; i < contours.size(); ++i) {
+                        let contour = contours.get(i);
+                        let area = cv.contourArea(contour);
+                        if (area < 50) continue; 
+
+                        validContours.push(contour);
+
+                        let rect = cv.boundingRect(contour);
+                        if (rect.x < minX) minX = rect.x;
+                        if (rect.y < minY) minY = rect.y;
+                        if (rect.x + rect.width > maxX) maxX = rect.x + rect.width;
+                        if (rect.y + rect.height > maxY) maxY = rect.y + rect.height;
+                    }
+
+                    if (validContours.length === 0) {
+                        alert("文字（オブジェクト）がうまく検出されませんでした。選択範囲を調整してください。");
+                        statusText.textContent = '準備完了';
+                        statusText.className = 'ready';
+                        return;
+                    }
+
+                    let stampWidth = maxX - minX;
+                    let stampHeight = maxY - minY;
+
+                    // --- ★【核心部】高解像度のZINE用1ページ（Canvas）を動的生成 ---
+                    const zineCanvas = document.createElement('canvas');
+                    // A4横の比率に近い高解像度（1600x1130）でベースを生成
+                    zineCanvas.width = 1600;
+                    zineCanvas.height = 1130;
+                    const ctx = zineCanvas.getContext('2d');
+
+                    // 1. 右側：背景白
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, zineCanvas.width, zineCanvas.height);
+
+                    // 2. 左側：元画像を「枠いっぱいにトリミング配置(Cover)」
+                    const targetWidth = 800;
+                    const targetHeight = 1130;
+                    const imgWidth = croppedCanvas.width;
+                    const imgHeight = croppedCanvas.height;
+                    const imgRatio = imgWidth / imgHeight;
+                    const targetRatio = targetWidth / targetHeight;
+                    
+                    let sX, sY, sSw, sSh;
+                    if (imgRatio > targetRatio) {
+                        sSh = imgHeight;
+                        sSw = imgHeight * targetRatio;
+                        sX = (imgWidth - sSw) / 2;
+                        sY = 0;
+                    } else {
+                        sSw = imgWidth;
+                        sSh = imgWidth / targetRatio;
+                        sX = 0;
+                        sY = (imgHeight - sSh) / 2;
+                    }
+                    ctx.drawImage(croppedCanvas, sX, sY, sSw, sSh, 0, 0, targetWidth, targetHeight);
+
+                    // 3. 右側：各種レイアウト・テキストの描画
+                    const startX = 870;
+                    const endX = 1530;
+                    const contentWidth = endX - startX;
+                    const themeColor = document.getElementById('themeColor').value;
+
+                    // 上部テキスト
+                    ctx.fillStyle = themeColor;
+                    ctx.font = "bold 26px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif";
+                    ctx.textAlign = "left";
+                    ctx.fillText(document.getElementById('inputHashtag').value, startX, 90);
+
+                    ctx.textAlign = "right";
+                    ctx.fillText(document.getElementById('inputNumber').value, endX, 90);
+
+                    // 下部ライン
+                    ctx.strokeStyle = themeColor;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(startX, 1030);
+                    ctx.lineTo(endX, 1030);
+                    ctx.stroke();
+
+                    // 下部テキスト
+                    ctx.font = "bold 22px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif";
+                    ctx.textAlign = "left";
+                    ctx.fillText("📍 " + document.getElementById('inputLocation').value, startX, 1075);
+
+                    ctx.textAlign = "right";
+                    ctx.fillText(document.getElementById('inputMemo').value, endX, 1075);
+
+                    // 4. 右側中央：抽出したグラフィックを指定のテーマカラーで描画
+                    const cX = startX + contentWidth / 2;
+                    const cY = 200 + (1030 - 200) / 2; // 白地エリアの上下中央
+                    const maxW = contentWidth - 40;
+                    const maxH = 1030 - 200 - 60;
+
+                    // スケーリング計算
+                    let scale = Math.min(maxW / stampWidth, maxH / stampHeight) * 0.85;
+                    const drawX = cX - (stampWidth * scale) / 2;
+                    const drawY = cY - (stampHeight * scale) / 2;
+
+                    ctx.fillStyle = themeColor;
+                    ctx.beginPath();
+                    for (let i = 0; i < validContours.length; ++i) {
+                        let contour = validContours[i];
+                        let pointsData = contour.data32S;
+                        for (let j = 0; j < pointsData.length; j += 2) {
+                            let x = drawX + (pointsData[j] - minX) * scale;
+                            let y = drawY + (pointsData[j+1] - minY) * scale;
+                            if (j === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        ctx.closePath();
+                    }
+                    ctx.fill();
+
+                    // 5. ギャラリー（一覧）への追加処理
+                    const pageImageUrl = zineCanvas.toDataURL('image/png');
+                    
+                    const card = document.createElement('div');
+                    card.className = 'stamp-card';
+
+                    const img = document.createElement('img');
+                    img.src = pageImageUrl;
+                    img.className = 'stamp-thumb';
+                    img.alt = 'ZINE Page';
+
+                    const dlBtn = document.createElement('a');
+                    dlBtn.className = 'btn btn-green btn-sm';
+                    dlBtn.textContent = `ページ画像をダウンロード (No.${document.getElementById('inputNumber').value})`;
+                    dlBtn.href = pageImageUrl;
+                    dlBtn.download = `zine_page_${document.getElementById('inputNumber').value}.png`;
+
+                    card.appendChild(img);
+                    card.appendChild(dlBtn);
+                    
+                    // 新しいページが常に左上（先頭）に並ぶように挿入
+                    stampList.insertBefore(card, stampList.firstChild);
+                    
+                    previewArea.style.display = 'flex';
+                    statusText.textContent = 'ZINEのページを記録しました！';
+                    statusText.className = 'ready';
+
+                    // 次の採取に向けて、自動でページ番号をカウントアップする親切設計
+                    const currentNum = parseInt(document.getElementById('inputNumber').value, 10);
+                    if (!isNaN(currentNum)) {
+                        document.getElementById('inputNumber').value = String(currentNum + 1).padStart(2, '0');
+                    }
+
+                    // メモリ解放
+                    src.delete(); gray.delete(); blurred.delete(); thresh.delete();
+                    contours.delete(); hierarchy.delete();
+
+                } catch (err) {
+                    console.error(err);
+                    statusText.textContent = 'エラーが発生しました';
+                    statusText.className = '';
+                }
+            }, 100);
+        });
     </script>
 </body>
 </html>
