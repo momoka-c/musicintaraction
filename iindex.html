@@ -3,73 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SVG Font Extractor (ZINE Creator Version)</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <title>SanpZINe</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div class="container">
-        <h1>SVG Font Extractor & ZINE Creator</h1>
-        <p class="description">画像をアップロードして範囲を選択し、ZINEの1ページを生成します</p>
-        
-        <div id="status">OpenCV.js を読み込み中...</div>
-        <br>
-        
-        <label id="uploadLabel" class="btn btn-blue disabled">
-            画像を選択する
-            <input type="file" id="fileInput" accept="image/*" disabled>
-        </label>
+    <!-- パソコン画面の中央にスマホの枠線（縦長）を作ります -->
+    <div class="smartphone-frame">
+        <div class="smartphone-display">
 
-        <div id="cropContainer" class="crop-container">
-            <img id="imageToCrop" src="" alt="Picture">
-        </div>
-
-        <div id="zineFormSection" class="zine-form-section">
-            <h3>ZINE ページテキスト設定</h3>
-            <div class="form-grid">
-                <div class="form-group">
-                    <label for="inputHashtag">誌名 / ハッシュタグ</label>
-                    <input type="text" id="inputHashtag" value="#街角写取録">
-                </div>
-                <div class="form-group">
-                    <label for="inputNumber">通し番号</label>
-                    <input type="text" id="inputNumber" value="01">
-                </div>
-                <div class="form-group">
-                    <label for="inputLocation">採取地 (左下)</label>
-                    <input type="text" id="inputLocation" value="新宿区水道町">
-                </div>
-                <div class="form-group">
-                    <label for="inputMemo">一言メモ (右下)</label>
-                    <input type="text" id="inputMemo" value="裏ドアまで可愛い">
-                </div>
-                <div class="form-group full-width">
-                    <label for="themeColor">テーマカラー（グラフィック・文字色）</label>
-                    <div class="color-picker-wrapper">
-                        <input type="color" id="themeColor" value="#f15a24">
-                        <span style="font-size: 0.85rem; color: #64748b;">サンプルの美しい朱色にセットされています</span>
+            <!-- ==========================================
+                 1. プロフィール設定画面
+                 ========================================== -->
+            <div id="profile-screen" class="screen-container">
+                <div class="header-pattern"></div>
+                <div class="main-card">
+                    <h1 class="title">Welcome to SanpZINe</h1>
+                    <p class="subtitle">ようこそ、ユーザー登録をして散歩に行こう！</p>
+                    <div class="logo-circle">
+                        <div class="footprints-icon">👣</div>
                     </div>
+                    <form id="profile-form">
+                        <div class="input-group">
+                            <label for="username" class="group-title">ユーザーネーム</label>
+                            <input type="text" id="username" name="username" required autocomplete="off">
+                        </div>
+                        <div class="input-group">
+                            <span class="group-title">お気に入りのジャンル</span>
+                            <div class="checkbox-grid">
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="font"><span class="checkmark"></span>文字・フォント</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="aging"><span class="checkmark"></span>経年変化</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="pictogram"><span class="checkmark"></span>ピクトグラム</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="parts"><span class="checkmark"></span>部品・構造</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="pattern"><span class="checkmark"></span>模様</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="shadow"><span class="checkmark"></span>影・光</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="manhole"><span class="checkmark"></span>地面・マンホール</label>
+                                <label class="checkbox-container"><input type="checkbox" name="genres" value="accidental"><span class="checkmark"></span>偶然の造形</label>
+                            </div>
+                        </div>
+                        <div class="button-container">
+                            <button type="submit" class="submit-btn">決定</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <button id="extractBtn" class="btn btn-orange" style="width: 100%;">選択範囲からZINEページを生成・記録</button>
-        </div>
 
-        <div id="previewArea" class="preview-area">
-            <h3 style="font-size: 1rem; color: #34495e; margin-bottom: 12px;">現在の2値化プレビュー (輪郭抽出確認用)</h3>
-            <canvas id="canvasOutput"></canvas>
-        </div>
+            <!-- ==========================================
+                 2. カメラ画面 (決定後に表示)
+                 ========================================== -->
+            <div id="camera-screen" class="screen-container hidden">
+                <div class="camera-viewport">
+                    <video id="webcam" autoplay playsinline></video>
+                    <div class="grid-overlay">
+                        <div class="grid-line-h h1"></div><div class="grid-line-h h2"></div>
+                        <div class="grid-line-v v1"></div><div class="grid-line-v v2"></div>
+                    </div>
+                    <button id="shutter-btn" class="shutter-circle">
+                        <span class="shutter-icon">👣</span>
+                    </button>
+                </div>
+                <div class="tab-navigator">
+                    <button class="tab-item active">撮る</button>
+                    <button class="tab-item">探す</button>
+                </div>
+            </div>
 
-        <div class="stamp-gallery-section">
-            <h2 class="stamp-gallery-title">生成されたZINEページ一覧</h2>
-            <div id="stampList" class="stamp-list"></div>
+            <!-- ==========================================
+                 3. 記録画面 (撮影後に表示)
+                 ========================================== -->
+            <div id="record-screen" class="screen-container hidden">
+                <div class="record-card">
+                    <div class="record-stamp">👣👣</div>
+                    <div class="preview-box">
+                        <canvas id="svg-canvas" width="400" height="400"></canvas>
+                    </div>
+                    <div class="color-palette">
+                        <button class="color-dot active" style="background-color: #d9381e;" data-color="#d9381e"></button>
+                        <button class="color-dot" style="background-color: #d9822b;" data-color="#d9822b"></button>
+                        <button class="color-dot" style="background-color: #d1db40;" data-color="#d1db40"></button>
+                        <button class="color-dot" style="background-color: #47db40;" data-color="#47db40"></button>
+                        <button class="color-dot" style="background-color: #4092db;" data-color="#4092db"></button>
+                        <button class="color-dot" style="background-color: #2b1ed9;" data-color="#2b1ed9"></button>
+                        <button class="color-dot" style="background-color: #bd1ed9;" data-color="#bd1ed9"></button>
+                    </div>
+                    <div class="info-group">
+                        <div class="info-row">
+                            <span class="info-icon">📍</span>
+                            <div class="info-content">
+                                <label class="info-label">場所</label>
+                                <input type="text" id="record-location" value="東京都新宿区大久保２丁目">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-group">
+                        <div class="info-row">
+                            <span class="info-icon">💬</span>
+                            <div class="info-content">
+                                <label class="info-label">コメント</label>
+                                <input type="text" id="record-comment" placeholder="裏ドアまでフォントでかわい〜〜">
+                            </div>
+                        </div>
+                    </div>
+                    <button id="save-btn" class="save-action-btn">記録する</button>
+                </div>
+                <div class="tab-navigator">
+                    <button class="tab-item active">撮る</button>
+                    <button class="tab-item">探す</button>
+                </div>
+            </div>
+          
+
+            <!-- ==========================================
+                 4. コレクション画面 (詳細表示エリアを追加)
+                 ========================================== -->
+                 <div class="collection-card">
+                    <div class="collection-header">
+                        <span class="collection-stamp">👣👣</span>
+                        <span class="collection-title">コレクション</span>
+                    </div>
+                    <div id="collection-grid" class="collection-grid"></div>
+                </div>
+    
+                <!-- ★ 新設：タップすると表示される詳細カードエリア -->
+                <div id="detail-view" class="detail-card hidden">
+                    <div class="detail-left">
+                        <div class="detail-image-wrapper">
+                            <img id="detail-img" src="" alt="詳細画像">
+                            <!-- 左下のナンバリングバッジ（例：! 31 のようなデザイン） -->
+                            <div class="detail-badge">
+                                <span class="badge-icon">👣</span> <span id="detail-number">1</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="detail-right">
+                        <div class="detail-user-row">
+                            <div class="detail-avatar">👣</div>
+                            <span id="detail-username" class="detail-username">sanpo_suki</span>
+                        </div>
+                        <div class="detail-info-item">
+                            <span class="detail-icon">📍</span>
+                            <p id="detail-location" class="detail-text">場所がここに表示されます</p>
+                        </div>
+                        <div class="detail-info-item">
+                            <span class="detail-icon">💬</span>
+                            <p id="detail-comment" class="detail-text">コメントがここに表示されます</p>
+                        </div>
+                    </div>
+                </div>
+     
+
+        <!-- ==========================================
+             5. ホームメニュー画面 (新規追加)
+             ========================================== -->
+        <div id="home-screen" class="screen-container hidden">
+            <div class="home-card">
+                <!-- 中央のロゴとユーザーネーム -->
+                <div class="home-profile-area">
+                    <div class="logo-circle">
+                        <div class="footprints-icon">👣</div>
+                    </div>
+                    <h2 id="home-username" class="home-username">sanpo_suki</h2>
+                </div>
+
+                <!-- メニューボタン群 -->
+                <div class="home-menu-list">
+                    <button id="menu-go-find" class="home-menu-item">
+                        <span class="menu-icon">👣👣</span>
+                        <span class="menu-text">探しに行く</span>
+                    </button>
+                    
+                    <button id="menu-collection" class="home-menu-item">
+                        <span class="menu-icon">👣👣</span>
+                        <span class="menu-text">コレクション</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 下部共通タブナビゲーション -->
+            <div class="tab-navigator">
+                <button class="tab-item" id="tab-take">撮る</button>
+                <button class="tab-item active" id="tab-find">探す</button>
+            </div>
         </div>
+    
+
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-    
+    <!-- 背景処理用の隠しキャンバス -->
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+
     <script src="script.js"></script>
-    
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
 </body>
 </html>

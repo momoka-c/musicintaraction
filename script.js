@@ -1,237 +1,267 @@
-const fileInput = document.getElementById('fileInput');
-const uploadLabel = document.getElementById('uploadLabel');
-const statusText = document.getElementById('status');
-const cropContainer = document.getElementById('cropContainer');
-const imageToCrop = document.getElementById('imageToCrop');
-const zineFormSection = document.getElementById('zineFormSection');
-const extractBtn = document.getElementById('extractBtn');
-const previewArea = document.getElementById('previewArea');
-const stampList = document.getElementById('stampList');
+let localStream = null;
+let originalMaskImage = null; // 切り抜いた図形（白黒マスク）を保持
+let currentSelectedColor = "#d9381e"; // デフォルト選択色
 
-let cropper = null;
+// ==========================================
+// イベントの流れ制御
+// ==========================================
 
-// 1. OpenCVの準備完了通知を受け取るグローバル関数
-window.onOpenCvReady = function() {
-    statusText.textContent = '準備完了';
-    statusText.className = 'ready';
-    uploadLabel.classList.remove('disabled');
-    fileInput.disabled = false;
-};
-
-// 2. 画像選択イベント
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    previewArea.style.display = 'none';
-    statusText.textContent = '範囲を選択し、テキストを入力して生成してください';
-    statusText.className = 'ready';
-
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        imageToCrop.src = event.target.result;
-        cropContainer.style.display = 'block';
-        zineFormSection.style.display = 'block';
-
-        if (cropper) {
-            cropper.destroy();
-        }
-
-        cropper = new Cropper(imageToCrop, {
-            viewMode: 1,
-            autoCropArea: 0.8,
-            background: false,
-            zoomable: false
-        });
-    };
-    reader.readAsDataURL(file);
-});
-
-// 3. ZINE生成ボタンイベント
-extractBtn.addEventListener('click', () => {
-    if (!cropper) return;
-
-    statusText.textContent = 'ZINEページを生成中...';
-    statusText.className = 'processing';
+// 1. プロフィール画面：決定ボタンが押されたとき
+document.getElementById('profile-form').addEventListener('submit', function(event) {
+    event.preventDefault(); // ページリロード防止
     
-    setTimeout(() => {
-        try {
-            const croppedCanvas = cropper.getCroppedCanvas();
-            
-            let src = cv.imread(croppedCanvas);
-            let gray = new cv.Mat();
-            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-
-            let blurred = new cv.Mat();
-            let ksize = new cv.Size(5, 5);
-            cv.GaussianBlur(gray, blurred, ksize, 0, 0, cv.BORDER_DEFAULT);
-
-            let thresh = new cv.Mat();
-            cv.threshold(blurred, thresh, 150, 255, cv.THRESH_BINARY);
-
-            cv.imshow('canvasOutput', thresh);
-
-            let contours = new cv.MatVector();
-            let hierarchy = new cv.Mat();
-            cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-
-            let minX = Infinity, minY = Infinity;
-            let maxX = -Infinity, maxY = -Infinity;
-            let validContours = [];
-
-            for (let i = 0; i < contours.size(); ++i) {
-                let contour = contours.get(i);
-                let area = cv.contourArea(contour);
-                if (area < 50) continue; 
-
-                validContours.push(contour);
-
-                let rect = cv.boundingRect(contour);
-                if (rect.x < minX) minX = rect.x;
-                if (rect.y < minY) minY = rect.y;
-                if (rect.x + rect.width > maxX) maxX = rect.x + rect.width;
-                if (rect.y + rect.height > maxY) maxY = rect.y + rect.height;
-            }
-
-            if (validContours.length === 0) {
-                alert("文字（オブジェクト）がうまく検出されませんでした。選択範囲を調整してください。");
-                statusText.textContent = '準備完了';
-                statusText.className = 'ready';
-                return;
-            }
-
-            let stampWidth = maxX - minX;
-            let stampHeight = maxY - minY;
-
-            const zineCanvas = document.createElement('canvas');
-            zineCanvas.width = 1600;
-            zineCanvas.height = 1130;
-            const ctx = zineCanvas.getContext('2d');
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, zineCanvas.width, zineCanvas.height);
-
-            const targetWidth = 800;
-            const targetHeight = 1130;
-            const imgWidth = croppedCanvas.width;
-            const imgHeight = croppedCanvas.height;
-            const imgRatio = imgWidth / imgHeight;
-            const targetRatio = targetWidth / targetHeight;
-            
-            let sX, sY, sSw, sSh;
-            if (imgRatio > targetRatio) {
-                sSh = imgHeight;
-                sSw = imgHeight * targetRatio;
-                sX = (imgWidth - sSw) / 2;
-                sY = 0;
-            } else {
-                sSw = imgWidth;
-                sSh = imgWidth / targetRatio;
-                sX = 0;
-                sY = (imgHeight - sSh) / 2;
-            }
-            ctx.drawImage(croppedCanvas, sX, sY, sSw, sSh, 0, 0, targetWidth, targetHeight);
-
-            const startX = 870;
-            const endX = 1530;
-            const contentWidth = endX - startX;
-            const themeColor = document.getElementById('themeColor').value;
-
-            ctx.fillStyle = themeColor;
-            ctx.font = "bold 26px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillText(document.getElementById('inputHashtag').value, startX, 90);
-
-            ctx.textAlign = "right";
-            ctx.fillText(document.getElementById('inputNumber').value, endX, 90);
-
-            ctx.strokeStyle = themeColor;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(startX, 1030);
-            ctx.lineTo(endX, 1030);
-            ctx.stroke();
-
-            ctx.font = "bold 22px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif";
-            ctx.textAlign = "left";
-            ctx.fillText("📍 " + document.getElementById('inputLocation').value, startX, 1075);
-
-            ctx.textAlign = "right";
-            ctx.fillText(document.getElementById('inputMemo').value, endX, 1075);
-
-            const cX = startX + contentWidth / 2;
-            const cY = 200 + (1030 - 200) / 2;
-            const maxW = contentWidth - 40;
-            const maxH = 1030 - 200 - 60;
-
-            let scale = Math.min(maxW / stampWidth, maxH / stampHeight) * 0.85;
-            const drawX = cX - (stampWidth * scale) / 2;
-            const drawY = cY - (stampHeight * scale) / 2;
-
-            ctx.fillStyle = themeColor;
-            ctx.beginPath();
-            for (let i = 0; i < validContours.length; ++i) {
-                let contour = validContours[i];
-                let pointsData = contour.data32S;
-                for (let j = 0; j < pointsData.length; j += 2) {
-                    let x = drawX + (pointsData[j] - minX) * scale;
-                    let y = drawY + (pointsData[j+1] - minY) * scale;
-                    if (j === 0) {
-                        ctx.moveTo(x, y);
-                    } else {
-                        ctx.lineTo(x, y);
-                    }
-                }
-                ctx.closePath();
-            }
-            ctx.fill();
-
-            const pageImageUrl = zineCanvas.toDataURL('image/png');
-            
-            const card = document.createElement('div');
-            card.className = 'stamp-card';
-
-            const img = document.createElement('img');
-            img.src = pageImageUrl;
-            img.className = 'stamp-thumb';
-            img.alt = 'ZINE Page';
-
-            const dlBtn = document.createElement('a');
-            dlBtn.className = 'btn btn-green btn-sm';
-            dlBtn.textContent = `ページ画像をダウンロード (No.${document.getElementById('inputNumber').value})`;
-            dlBtn.href = pageImageUrl;
-            dlBtn.download = `zine_page_${document.getElementById('inputNumber').value}.png`;
-
-            card.appendChild(img);
-            card.appendChild(dlBtn);
-            
-            stampList.insertBefore(card, stampList.firstChild);
-            
-            previewArea.style.display = 'flex';
-            statusText.textContent = 'ZINEのページを記録しました！';
-            statusText.className = 'ready';
-
-            const currentNum = parseInt(document.getElementById('inputNumber').value, 10);
-            if (!isNaN(currentNum)) {
-                document.getElementById('inputNumber').value = String(currentNum + 1).padStart(2, '0');
-            }
-
-            src.delete(); gray.delete(); blurred.delete(); thresh.delete();
-            contours.delete(); hierarchy.delete();
-
-        } catch (err) {
-            console.error(err);
-            statusText.textContent = 'エラーが発生しました';
-            statusText.className = '';
-        }
-    }, 100);
+    // 画面を切り替える
+    document.getElementById('profile-screen').classList.add('hidden');
+    document.getElementById('camera-screen').classList.remove('hidden');
+    
+    // カメラを起動
+    initCamera();
 });
 
-// 4. PWA用のServiceWorkerを登録
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('ServiceWorker registered', reg))
-            .catch(err => console.error('ServiceWorker registration failed', err));
+// 2. カメラ画面：シャッター（足跡）ボタンが押されたとき
+document.getElementById('shutter-btn').addEventListener('click', function() {
+    const video = document.getElementById('webcam');
+    const hiddenCanvas = document.getElementById('hidden-canvas');
+    const ctx = hiddenCanvas.getContext('2d');
+
+    if (!localStream) return;
+
+    // 現在のビデオフレームのサイズに隠しキャンバスを合わせる
+    hiddenCanvas.width = video.videoWidth;
+    hiddenCanvas.height = video.videoHeight;
+    
+    // 隠しキャンバスに現在の映像を焼き付ける
+    ctx.drawImage(video, 0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+    // 画像から「形」を二値化抽出（切り抜きマスクを作成）
+    processImageToMask(hiddenCanvas, ctx);
+
+    // カメラストリームを停止してエコにする
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+
+    // 画面を記録画面に切り替える
+    document.getElementById('camera-screen').classList.add('hidden');
+    document.getElementById('record-screen').classList.remove('hidden');
+
+    // 切り抜いたキャンバスを色付きで描画
+    renderColoredCanvas();
+});
+
+// ==========================================
+// カメラ・画像処理ロジック
+// ==========================================
+
+// カメラ映像をvideoタグに紐づける関数
+function initCamera() {
+    const video = document.getElementById('webcam');
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment', width: 640, height: 640 }, 
+            audio: false 
+        })
+        .then(function(stream) {
+            localStream = stream;
+            video.srcObject = stream;
+        })
+        .catch(function(error) {
+            console.error("カメラ起動エラー:", error);
+            alert("カメラの起動に失敗しました。ブラウザのカメラ権限を確認してください。");
+        });
+    }
+}
+
+// 撮影した画像を解析して文字や輪郭（明るい部分）を切り抜く関数
+function processImageToMask(canvas, ctx) {
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+
+    // ピクセルを走査して閾値処理
+    for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        
+        // 輝度（明るさ）を計算
+        const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        // 【しきい値調整】明るいところ（文字など）を残して、暗い背景を透明化
+        if (brightness > 110) { 
+            data[i] = 0;     // シルエット用（色付けするので何色でもOK）
+            data[i+1] = 0;
+            data[i+2] = 0;
+            data[i+3] = 255; // 不透明（残す）
+        } else {
+            data[i+3] = 0;   // 完全透過（切り抜く）
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    
+    // 形をデータURL経由で画像オブジェクトとして保存
+    originalMaskImage = new Image();
+    originalMaskImage.src = canvas.toDataURL();
+}
+
+// 選択された色でマスクを塗りつぶしてプレビューに描画
+function renderColoredCanvas() {
+    if (!originalMaskImage) return;
+
+    const mainCanvas = document.getElementById('svg-canvas');
+    const ctx = mainCanvas.getContext('2d');
+    
+    originalMaskImage.onload = function() {
+        ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        
+        // まずパレットで選ばれている色でCanvas全体を塗りつぶす
+        ctx.fillStyle = currentSelectedColor;
+        ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+
+        // 重ね合わせの設定（destination-in：描画済みの色を、次に重ねる画像の形だけでくり抜く）
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(originalMaskImage, 0, 0, mainCanvas.width, mainCanvas.height);
+        
+        // 設定を通常（上書きモード）に戻す
+        ctx.globalCompositeOperation = 'source-over';
+    };
+
+    if (originalMaskImage.complete) {
+        originalMaskImage.onload();
+    }
+}
+
+// ==========================================
+// カラーパレット & 保存の制御
+// ==========================================
+
+const colorDots = document.querySelectorAll('.color-dot');
+colorDots.forEach(dot => {
+    dot.addEventListener('click', function() {
+        colorDots.forEach(d => d.classList.remove('active'));
+        this.classList.add('active');
+
+        // 色情報を更新して再描画
+        currentSelectedColor = this.getAttribute('data-color');
+        renderColoredCanvas();
     });
+});
+
+// 最後の「記録する」ボタンの処理
+document.getElementById('save-btn').addEventListener('click', function() {
+    const loc = document.getElementById('record-location').value;
+    const com = document.getElementById('record-comment').value;
+    const finalImage = document.getElementById('svg-canvas').toDataURL();
+
+    const resultData = {
+        image: finalImage,
+        location: loc,
+        comment: com
+    };
+
+    console.log("保存されたデータ:", resultData);
+    alert("散歩の記録を保存しました！\nコンソールを確認してください。");
+});
+
+// --- script.js の末尾に追加、または既存の保存イベントを書き換え ---
+
+// アプリ起動時、または読み込み時にコレクションを初期描画
+window.addEventListener('DOMContentLoaded', () => {
+    initCamera(); 
+    setupTabEvents();
+    renderCollectionGrid();
+});
+
+// タブ切り替えのイベント設定
+function setupTabEvents() {
+    // すべての「撮る」「探す」ボタンを制御
+    document.querySelectorAll('.tab-navigator').forEach(nav => {
+        const buttons = nav.querySelectorAll('.tab-item');
+        
+        buttons[0].addEventListener('click', () => {
+            // 「撮る」が押されたらカメラ画面へ（ストリーム再開が必要ならinitCamera）
+            switchScreen('camera-screen');
+            initCamera();
+        });
+        
+        buttons[1].addEventListener('click', () => {
+            // 「探す」が押されたらコレクション画面へ
+            switchScreen('collection-screen');
+            renderCollectionGrid();
+        });
+    });
+}
+
+// 画面切り替えの共通ヘルパー
+function switchScreen(screenId) {
+    document.getElementById('profile-screen').classList.add('hidden');
+    document.getElementById('camera-screen').classList.add('hidden');
+    document.getElementById('record-screen').classList.add('hidden');
+    document.getElementById('collection-screen').classList.add('hidden');
+    
+    document.getElementById(screenId).classList.remove('hidden');
+}
+
+// ★ 「記録する」ボタンの処理をコレクション連動用にアップデート
+document.getElementById('save-btn').addEventListener('click', function() {
+    const loc = document.getElementById('record-location').value;
+    const com = document.getElementById('record-comment').value;
+    const finalImage = document.getElementById('svg-canvas').toDataURL();
+
+    const newRecord = {
+        image: finalImage,
+        location: loc,
+        comment: com,
+        date: new Date().getTime()
+    };
+
+    // 既存のコレクションデータをLocalStorageから取得
+    let collection = JSON.parse(localStorage.getItem('sanpzine_collection')) || [];
+    
+    // 新しいデータを先頭（または末尾）に追加
+    collection.push(newRecord);
+    
+    // 再び保存
+    localStorage.setItem('sanpzine_collection', JSON.stringify(collection));
+
+    alert("コレクションに追加しました！");
+    
+    // 自動的にコレクション画面（探すタブ）に移動
+    switchScreen('collection-screen');
+    renderCollectionGrid();
+});
+
+// ★ コレクションの24マスのグリッドを生成・描画する関数
+function renderCollectionGrid() {
+    const gridContainer = document.getElementById('collection-grid');
+    gridContainer.innerHTML = ''; // 一度リセット
+
+    // 保存されているデータを取得
+    const collection = JSON.parse(localStorage.getItem('sanpzine_collection')) || [];
+
+    // 画像のように、最低24個（またはそれ以上）のマスのグリッドを作成
+    const totalCells = Math.max(24, Math.ceil((collection.length + 1) / 4) * 4);
+
+    for (let i = 0; i < totalCells; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('grid-cell');
+
+        // もしこのインデックスに撮影データがあれば画像を配置
+        if (collection[i]) {
+            cell.classList.add('has-image');
+            const img = document.createElement('img');
+            img.src = collection[i].image;
+            cell.appendChild(img);
+        } else {
+            // データがない空マスのうち、5, 10, 15, 20番目（インデックス+1）に数字を表示
+            const cellNumber = i + 1;
+            if (cellNumber === 5 || cellNumber === 10 || cellNumber === 15 || cellNumber === 20) {
+                const numSpan = document.createElement('span');
+                numSpan.classList.add('grid-number');
+                numSpan.textContent = cellNumber;
+                cell.appendChild(numSpan);
+            }
+        }
+
+        gridContainer.appendChild(cell);
+    }
 }
